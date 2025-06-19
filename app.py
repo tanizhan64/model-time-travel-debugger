@@ -1,4 +1,4 @@
-# app.py — Final Version with Explanation Text for Normal Users
+# app.py — Final Stable Version (No sklearn error, all sections)
 
 import pandas as pd
 import numpy as np
@@ -29,6 +29,9 @@ DATA_PATHS = {
     "v2": f"{DATA_DIR}/housing_v2.csv"
 }
 
+# -----------------------
+# Utils
+# -----------------------
 def train_and_save_model(data, version):
     X = data.drop(columns=["target"])
     y = data["target"]
@@ -41,7 +44,7 @@ def evaluate_model(model, X, y):
     preds = model.predict(X)
     return {
         "MAE": mean_absolute_error(y, preds),
-        "RMSE": mean_squared_error(y, preds, squared=False),
+        "RMSE": np.sqrt(mean_squared_error(y, preds)),  # Fixed here
         "R2": r2_score(y, preds)
     }
 
@@ -65,22 +68,27 @@ def get_explanation_text(pred_v1, pred_v2, top_features):
     return txt
 
 # -----------------------
-# UI Starts
+# Section 1: Header
 # -----------------------
 st.title("🧠 Model-Time Travel Debugger")
 st.sidebar.title("🔥 Highly Recommended")
 st.sidebar.markdown("""
-- Use housing demo to learn feature shift
-- Click Explain v1 vs v2 to see model change
-- SHAP explains why the model changed
-- Retrain if you edit the data files
+- Use built-in housing demo
+- Select a model and row
+- Use explain to compare model versions
+- SHAP tells you **why** prediction changed
+- Retrain if needed
 """)
 
+# Train models if not yet
 for ver in ["v1", "v2"]:
     if not os.path.exists(MODEL_PATHS[ver]):
         df = pd.read_csv(DATA_PATHS[ver])
         train_and_save_model(df, ver)
 
+# -----------------------
+# Section 2: Row Picker
+# -----------------------
 selected_version = st.selectbox("Select Model Version", ["v1", "v2"])
 df = pd.read_csv(DATA_PATHS[selected_version])
 model = joblib.load(MODEL_PATHS[selected_version])
@@ -92,18 +100,28 @@ X_sample = X.iloc[[row_idx]]
 st.write("### 🔍 Selected Input Row")
 st.dataframe(X_sample)
 
+# -----------------------
+# Section 3: Prediction
+# -----------------------
 st.write("### 📈 Prediction")
 pred = model.predict(X_sample)[0]
 st.success(f"Prediction: `{pred:.2f}`")
 
+# -----------------------
+# Section 4: SHAP Viz
+# -----------------------
 explain_row(model, X_sample)
 
-# --------- SHAP Shift Explanation ---------
+# -----------------------
+# Section 5: Explain Button
+# -----------------------
 if st.button("🧠 Explain v1 vs v2 Shift"):
     df_v1 = pd.read_csv(DATA_PATHS["v1"])
     df_v2 = pd.read_csv(DATA_PATHS["v2"])
-    X1, y1 = df_v1.drop(columns=["target"]), df_v1["target"]
-    X2, y2 = df_v2.drop(columns=["target"]), df_v2["target"]
+    X1 = df_v1.drop(columns=["target"])
+    y1 = df_v1["target"]
+    X2 = df_v2.drop(columns=["target"])
+    y2 = df_v2["target"]
     model_v1 = joblib.load(MODEL_PATHS["v1"])
     model_v2 = joblib.load(MODEL_PATHS["v2"])
 
@@ -119,11 +137,12 @@ if st.button("🧠 Explain v1 vs v2 Shift"):
     top_idx = np.argsort(np.abs(diffs))[::-1][:3]
     top_features = [(X.columns[i], diffs[i]) for i in top_idx]
 
-    text = get_explanation_text(pred_v1, pred_v2, top_features)
     st.markdown("### 🗣️ Natural Explanation")
-    st.info(text)
+    st.info(get_explanation_text(pred_v1, pred_v2, top_features))
 
-    # Metrics and drift
+    # -----------------------
+    # Section 6: Metrics + Drift
+    # -----------------------
     metrics_v1 = evaluate_model(model_v1, X1, y1)
     metrics_v2 = evaluate_model(model_v2, X2, y2)
     drift_df = pd.DataFrame({
@@ -136,12 +155,15 @@ if st.button("🧠 Explain v1 vs v2 Shift"):
     st.subheader("📊 Metric Comparison")
     st.write("Model v1:", metrics_v1)
     st.write("Model v2:", metrics_v2)
+
     st.subheader("📉 Feature Drift")
     st.dataframe(drift_df)
 
-# --------- Retrain ---------
+# -----------------------
+# Section 7: Retrain
+# -----------------------
 if st.button("🔁 Retrain v1 & v2 Models"):
     for ver in ["v1", "v2"]:
         df = pd.read_csv(DATA_PATHS[ver])
         train_and_save_model(df, ver)
-    st.success("✅ Models retrained!")
+    st.success("✅ Models retrained successfully.")
