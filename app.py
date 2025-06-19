@@ -9,6 +9,7 @@ import os
 import streamlit.components.v1 as components
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+shap.initjs()
 
 st.set_page_config(page_title="Model-Time Travel Debugger", layout="wide")
 
