@@ -1,10 +1,6 @@
 # -------------------------------
-# Model-Time Travel Debugger (Pro)
+# Model-Time Travel Debugger (Pro) — with Clickable Metrics + Drift
 # -------------------------------
-# Author: Asta | AI Partner: Infinity King
-# Description: Visualize, explain, and compare ML model version predictions using SHAP.
-# Supports prediction shift insight, metrics comparison, and data drift analysis.
-# Designed for Streamlit Cloud deployment — clean UX, full pro layout.
 
 import pandas as pd
 import numpy as np
@@ -16,14 +12,8 @@ import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-# -------------------------------
-# Streamlit Page Config
-# -------------------------------
 st.set_page_config(page_title="Model-Time Travel Debugger", layout="wide")
 
-# -------------------------------
-# Paths
-# -------------------------------
 MODEL_DIR = "models"
 DATA_DIR = "data"
 os.makedirs(MODEL_DIR, exist_ok=True)
@@ -38,9 +28,6 @@ DATA_PATHS = {
     "v2": f"{DATA_DIR}/housing_v2.csv"
 }
 
-# -------------------------------
-# Utilities
-# -------------------------------
 def train_and_save_model(data, version):
     X = data.drop(columns=["target"])
     y = data["target"]
@@ -85,8 +72,8 @@ st.sidebar.markdown("""
 1. Select a model and row  
 2. See prediction + SHAP explanation  
 3. Compare model versions  
-4. Review metrics + drift  
-5. Retrain if data changed  
+4. View metrics + drift in collapsible section  
+5. Retrain if needed  
 """)
 
 # -------------------------------
@@ -148,34 +135,38 @@ if st.button("🧠 Explain v1 vs v2 Shift"):
     st.info(get_explanation_text(pred_v1, pred_v2, top_features))
 
 # -------------------------------
-# Show Metrics + Drift (Always Visible)
+# Metrics + Drift: Collapsible
 # -------------------------------
-df_v1 = pd.read_csv(DATA_PATHS["v1"])
-df_v2 = pd.read_csv(DATA_PATHS["v2"])
-X1, y1 = df_v1.drop(columns=["target"]), df_v1["target"]
-X2, y2 = df_v2.drop(columns=["target"]), df_v2["target"]
-model_v1 = joblib.load(MODEL_PATHS["v1"])
-model_v2 = joblib.load(MODEL_PATHS["v2"])
+with st.expander("📊 Click to View: Metrics + Feature Drift", expanded=False):
+    st.markdown("### 📏 Model Evaluation Metrics")
 
-metrics_v1 = evaluate_model(model_v1, X1, y1)
-metrics_v2 = evaluate_model(model_v2, X2, y2)
-drift_df = pd.DataFrame({
-    "Feature": X1.columns,
-    "Mean_v1": X1.mean().values,
-    "Mean_v2": X2.mean().values,
-    "ΔMean": X2.mean().values - X1.mean().values
-})
+    df_v1 = pd.read_csv(DATA_PATHS["v1"])
+    df_v2 = pd.read_csv(DATA_PATHS["v2"])
+    X1, y1 = df_v1.drop(columns=["target"]), df_v1["target"]
+    X2, y2 = df_v2.drop(columns=["target"]), df_v2["target"]
+    model_v1 = joblib.load(MODEL_PATHS["v1"])
+    model_v2 = joblib.load(MODEL_PATHS["v2"])
 
-st.subheader("📊 Metrics + Feature Drift")
-col1, col2 = st.columns(2)
-with col1:
-    st.markdown("**Model v1 Metrics**")
-    st.json(metrics_v1)
-with col2:
-    st.markdown("**Model v2 Metrics**")
-    st.json(metrics_v2)
+    metrics_v1 = evaluate_model(model_v1, X1, y1)
+    metrics_v2 = evaluate_model(model_v2, X2, y2)
 
-st.dataframe(drift_df)
+    st.markdown("#### Model v1")
+    for k, v in metrics_v1.items():
+        st.write(f"- {k}: `{v:.4f}`")
+
+    st.markdown("#### Model v2")
+    for k, v in metrics_v2.items():
+        st.write(f"- {k}: `{v:.4f}`")
+
+    drift_df = pd.DataFrame({
+        "Feature": X1.columns,
+        "Mean_v1": X1.mean().values,
+        "Mean_v2": X2.mean().values,
+        "ΔMean": X2.mean().values - X1.mean().values
+    })
+
+    st.markdown("### 🔄 Feature Drift Table")
+    st.dataframe(drift_df)
 
 # -------------------------------
 # Retrain Models
