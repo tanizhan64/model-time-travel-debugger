@@ -1,34 +1,34 @@
-# model_time_travel_debugger: Phase 1 - SHAP-Based Prediction Viewer
+# app_housing_only.py — No upload, only built-in housing dataset
 
 import pandas as pd
 import numpy as np
 import shap
 import joblib
 import streamlit as st
-from streamlit.components.v1 import html
-from sklearn.ensemble import RandomForestRegressor
 import os
+import streamlit.components.v1 as components
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-# --------------------------
-# Configurations
-# --------------------------
+st.set_page_config(page_title="Model-Time Travel Debugger", layout="wide")
+
+# --- Paths ---
 MODEL_DIR = "models"
-DATA_PATHS = {
-    "v1": "data/housing_v1.csv",
-    "v2": "data/housing_v2.csv"
-}
+DATA_DIR = "data"
+os.makedirs(MODEL_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
+
 MODEL_PATHS = {
     "v1": f"{MODEL_DIR}/model_v1.pkl",
     "v2": f"{MODEL_DIR}/model_v2.pkl"
 }
+DATA_PATHS = {
+    "v1": f"{DATA_DIR}/housing_v1.csv",
+    "v2": f"{DATA_DIR}/housing_v2.csv"
+}
 
-# --------------------------
-# Utility Functions
-# --------------------------
-def load_data(version):
-    return pd.read_csv(DATA_PATHS[version])
-
-def train_model(data, version):
+# --- Utils ---
+def train_and_save_model(data, version):
     X = data.drop(columns=["target"])
     y = data["target"]
     model = RandomForestRegressor(random_state=42)
@@ -36,47 +36,72 @@ def train_model(data, version):
     joblib.dump(model, MODEL_PATHS[version])
     return model
 
-def load_model(version):
-    return joblib.load(MODEL_PATHS[version])
+def evaluate_model(model, X, y):
+    preds = model.predict(X)
+    return {
+        "MAE": mean_absolute_error(y, preds),
+        "RMSE": mean_squared_error(y, preds) ** 0.5,
+        "R2": r2_score(y, preds)
+    }
 
-def explain_prediction(model, X_sample):
+def explain_row(model, X_sample):
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_sample)
-    return shap_values, explainer
+    force_plot = shap.force_plot(
+        explainer.expected_value, shap_values, X_sample, matplotlib=False
+    )
+    components.html(force_plot.html(), height=300)
 
-# --------------------------
-# Auto-train Models if Not Found
-# --------------------------
-if not os.path.exists(MODEL_DIR):
-    os.makedirs(MODEL_DIR)
+# -------------------------
+# 🏠 Housing Dataset Only
+# -------------------------
+st.title("🧠 Model-Time Travel Debugger (Housing Dataset Only)")
 
-if not os.path.exists(MODEL_PATHS["v1"]) or not os.path.exists(MODEL_PATHS["v2"]):
-    df_v1 = load_data("v1")
-    df_v2 = load_data("v2")
-    train_model(df_v1, "v1")
-    train_model(df_v2, "v2")
-
-# --------------------------
-# Streamlit App
-# --------------------------
-st.title("🧠 Model-Time Travel: Phase 1 - SHAP Viewer")
+# Load or train models
+for ver in ["v1", "v2"]:
+    if not os.path.exists(MODEL_PATHS[ver]):
+        df = pd.read_csv(DATA_PATHS[ver])
+        train_and_save_model(df, ver)
 
 selected_version = st.selectbox("Select Model Version", ["v1", "v2"])
-data = load_data(selected_version)
-model = load_model(selected_version)
+df = pd.read_csv(DATA_PATHS[selected_version])
+model = joblib.load(MODEL_PATHS[selected_version])
+X = df.drop(columns=["target"])
+y = df["target"]
 
-sample_idx = st.slider("Select Row Index", 0, len(data) - 1, 0)
-X = data.drop(columns=["target"])
-X_sample = X.iloc[[sample_idx]]
+row_idx = st.slider("Select Row Index", 0, len(df)-1, 0)
+X_sample = X.iloc[[row_idx]]
+st.write("### 🔍 Selected Input Row")
+st.dataframe(X_sample)
 
-st.write("### 🔍 Input Features")
-st.write(X_sample)
-
+st.write("### 📈 Prediction")
 pred = model.predict(X_sample)[0]
-st.write("### 📈 Model Prediction")
-st.success(f"{pred:.2f}")
+st.success(f"Prediction: `{pred:.2f}`")
 
-shap_values, explainer = explain_prediction(model, X_sample)
-shap.initjs()
-shap_html = f"<head>{shap.getjs()}</head><body>{shap.force_plot(explainer.expected_value, shap_values, X_sample, matplotlib=False).data}</body>"
-html(shap_html, height=300)
+st.write("### 📊 SHAP Explanation")
+explain_row(model, X_sample)
+
+if st.button("🔬 Compare Metrics & Drift"):
+    df_v1 = pd.read_csv(DATA_PATHS["v1"])
+    df_v2 = pd.read_csv(DATA_PATHS["v2"])
+    X1, y1 = df_v1.drop(columns=["target"]), df_v1["target"]
+    X2, y2 = df_v2.drop(columns=["target"]), df_v2["target"]
+    model_v1 = joblib.load(MODEL_PATHS["v1"])
+    model_v2 = joblib.load(MODEL_PATHS["v2"])
+    metrics_v1 = evaluate_model(model_v1, X1, y1)
+    metrics_v2 = evaluate_model(model_v2, X2, y2)
+    drift_df = pd.DataFrame({
+        "Feature": X1.columns,
+        "Mean_v1": X1.mean().values,
+        "Mean_v2": X2.mean().values,
+        "Std_v1": X1.std().values,
+        "Std_v2": X2.std().values
+    })
+    drift_df["ΔMean"] = drift_df["Mean_v2"] - drift_df["Mean_v1"]
+    drift_df["ΔStd"] = drift_df["Std_v2"] - drift_df["Std_v1"]
+
+    st.subheader("📊 Metric Comparison")
+    st.write("Model v1:", metrics_v1)
+    st.write("Model v2:", metrics_v2)
+    st.subheader("📉 Feature Drift")
+    st.dataframe(drift_df)
