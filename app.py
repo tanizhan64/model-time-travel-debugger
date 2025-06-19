@@ -137,7 +137,7 @@ if st.button("🧠 Explain v1 vs v2 Shift"):
 # -------------------------------
 # Metrics + Drift: Collapsible
 # -------------------------------
-with st.expander("📊 Click to View: Metrics + Feature Drift", expanded=False):
+with st.expander("📊 Metrics + Feature Drift", expanded=False):
     st.markdown("### 📏 Model Evaluation Metrics")
 
     df_v1 = pd.read_csv(DATA_PATHS["v1"])
