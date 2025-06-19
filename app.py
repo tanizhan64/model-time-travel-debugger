@@ -1,7 +1,6 @@
 # -------------------------------
-# Model-Time Travel Debugger (Final Version)
+# Model-Time Travel Debugger — Final UI Consistent Version
 # -------------------------------
-# Built for clarity, professional use, and Streamlit Cloud deployment.
 
 import pandas as pd
 import numpy as np
@@ -65,16 +64,14 @@ def get_explanation_text(pred_v1, pred_v2, top_features):
     return explanation
 
 # -------------------------------
-# UI Header
+# UI — Header
 # -------------------------------
 st.title("🧠 Model-Time Travel Debugger")
 st.sidebar.header("📘 Instructions")
 st.sidebar.markdown("""
 1. Select model + row  
 2. View prediction and SHAP  
-3. Click **Explain** for version difference  
-4. Expand **Metrics & Drift** for full evaluation  
-5. Click **Retrain** if needed  
+3. Click buttons to explore v1 vs v2, metrics, and retrain  
 """)
 
 # -------------------------------
@@ -136,9 +133,9 @@ if st.button("🧠 Explain v1 vs v2 Shift"):
     st.info(get_explanation_text(pred_v1, pred_v2, top_features))
 
 # -------------------------------
-# Metrics + Drift: Click to View
+# Metrics + Drift Button
 # -------------------------------
-with st.expander("📈 View: Model Metrics & Feature Drift", expanded=False):
+if st.button("📈 View: Model Metrics & Feature Drift"):
     model_v1 = joblib.load(MODEL_PATHS["v1"])
     model_v2 = joblib.load(MODEL_PATHS["v2"])
     df_v1 = pd.read_csv(DATA_PATHS["v1"])
@@ -146,17 +143,17 @@ with st.expander("📈 View: Model Metrics & Feature Drift", expanded=False):
     X1, y1 = df_v1.drop(columns=["target"]), df_v1["target"]
     X2, y2 = df_v2.drop(columns=["target"]), df_v2["target"]
 
-    st.markdown("### 📏 Evaluation Metrics")
+    st.markdown("### 📏 Model Evaluation Metrics")
+
     metrics_v1 = evaluate_model(model_v1, X1, y1)
-    metrics_v2 = evaluate_model(model_v2, X2, y2)
-
     st.markdown("#### 🧪 Model v1")
-    for key, value in metrics_v1.items():
-        st.markdown(f"- **{key}**: `{value:.4f}`")
+    for k, v in metrics_v1.items():
+        st.markdown(f"- **{k}**: `{v:.4f}`")
 
+    metrics_v2 = evaluate_model(model_v2, X2, y2)
     st.markdown("#### 🧪 Model v2")
-    for key, value in metrics_v2.items():
-        st.markdown(f"- **{key}**: `{value:.4f}`")
+    for k, v in metrics_v2.items():
+        st.markdown(f"- **{k}**: `{v:.4f}`")
 
     st.markdown("### 🔄 Feature Drift Table")
     drift_df = pd.DataFrame({
@@ -168,7 +165,7 @@ with st.expander("📈 View: Model Metrics & Feature Drift", expanded=False):
     st.dataframe(drift_df)
 
 # -------------------------------
-# Retrain
+# Retrain Button
 # -------------------------------
 if st.button("🔁 Retrain Both Models"):
     for version in ["v1", "v2"]:
