@@ -1,5 +1,5 @@
 
-# 🧠 Model-Time Travel Debugger — Text Input for Target Column
+# 🧠 Model-Time Travel Debugger — Upload UI Fixed + Text Input Target
 
 import pandas as pd
 import numpy as np
@@ -63,30 +63,36 @@ def get_explanation_text(pred_v1, pred_v2, top_features):
 # -------------------------------
 # Header
 # -------------------------------
-st.title("🧠 Model-Time Travel Debugger (Target via Text Input)")
+st.title("🧠 Model-Time Travel Debugger (Upload UI Fixed)")
 data_mode = st.radio("📦 Choose Data Mode", ["📘 Use Example Dataset", "📁 Upload Your Own CSVs"])
 
-# -------------------------------
-# Upload Mode: Target Text Input
-# -------------------------------
-if data_mode == "📁 Upload Your Own CSVs":
-    for ver in ["v1", "v2"]:
-        uploaded = st.sidebar.file_uploader(f"Upload CSV for {ver.upper()}", type=["csv"], key=ver)
-        if uploaded:
-            df = pd.read_csv(uploaded)
-            st.sidebar.markdown(f"**Enter Target Column Name for {ver.upper()}**")
-            target_col = st.sidebar.text_input(f"Target column for {ver.upper()}", key=f"target_{ver}")
-            if target_col and target_col in df.columns:
-                df.to_csv(UPLOAD_PATHS[ver], index=False)
-                with open(TARGET_META[ver], "w") as f:
-                    f.write(target_col)
-                train_and_save_model(df, ver, target_col)
-                st.sidebar.success(f"✅ {ver.upper()} trained with target: `{target_col}`")
-            elif target_col:
-                st.sidebar.error(f"❌ `{target_col}` not found in columns: {', '.join(df.columns)}")
+uploaded_csv = {}
+targets_selected = {}
 
 # -------------------------------
-# Load Data
+# Upload UI Section Always Visible (Fix)
+# -------------------------------
+if data_mode == "📁 Upload Your Own CSVs":
+    st.sidebar.markdown("### 📤 Upload Your CSVs and Target")
+    for ver in ["v1", "v2"]:
+        uploaded = st.sidebar.file_uploader(f"Upload CSV for {ver.upper()}", type=["csv"], key=ver)
+        target_input = st.sidebar.text_input(f"Target column for {ver.upper()}", key=f"target_{ver}")
+        uploaded_csv[ver] = uploaded
+        targets_selected[ver] = target_input
+
+        if uploaded and target_input:
+            df = pd.read_csv(uploaded)
+            if target_input in df.columns:
+                df.to_csv(UPLOAD_PATHS[ver], index=False)
+                with open(TARGET_META[ver], "w") as f:
+                    f.write(target_input)
+                train_and_save_model(df, ver, target_input)
+                st.sidebar.success(f"✅ {ver.upper()} trained on target `{target_input}`")
+            else:
+                st.sidebar.error(f"'{target_input}' not found in columns: {list(df.columns)}")
+
+# -------------------------------
+# Helpers
 # -------------------------------
 def get_data(ver):
     if data_mode == "📁 Upload Your Own CSVs" and os.path.exists(UPLOAD_PATHS[ver]):
@@ -98,11 +104,17 @@ def get_target_col(ver, df):
         return open(TARGET_META[ver]).read().strip()
     return "target"
 
-# Block if upload mode but no files yet
-if data_mode == "📁 Upload Your Own CSVs" and not all(os.path.exists(UPLOAD_PATHS[v]) and os.path.exists(TARGET_META[v]) for v in ["v1", "v2"]):
-    st.warning("Please upload both CSVs and enter valid target column names.")
-    st.stop()
+# -------------------------------
+# Guard if Incomplete Uploads
+# -------------------------------
+if data_mode == "📁 Upload Your Own CSVs":
+    if not all(os.path.exists(UPLOAD_PATHS[v]) and os.path.exists(TARGET_META[v]) for v in ["v1", "v2"]):
+        st.warning("Please upload both CSVs and specify a valid target column name.")
+        st.stop()
 
+# -------------------------------
+# Core UI After Upload
+# -------------------------------
 selected_version = st.selectbox("Select Model Version", ["v1", "v2"])
 df = get_data(selected_version)
 target_col = get_target_col(selected_version, df)
