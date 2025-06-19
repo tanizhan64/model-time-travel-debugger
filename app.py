@@ -1,4 +1,4 @@
-# model_time_travel_debugger: Full App (Phase 1–4)
+# model_time_travel_debugger
 
 import os
 import joblib
@@ -64,7 +64,7 @@ def evaluate_model(model, X, y):
     preds = model.predict(X)
     return {
         "MAE": mean_absolute_error(y, preds),
-        "RMSE": mean_squared_error(y, preds, squared=False),
+        "RMSE": mean_squared_error(y, preds) ** 0.5,  # manually compute sqrt
         "R2": r2_score(y, preds)
     }
 
