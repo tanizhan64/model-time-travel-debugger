@@ -1,4 +1,4 @@
-# app.py — Final Unified App with Upload Support and SHAP Fix
+# app.py — Final Patched: Unified SHAP Fix for All Modes
 
 import pandas as pd
 import numpy as np
@@ -141,6 +141,8 @@ else:
             X_sample = X.iloc[[rand_idx]]
             st.write(f"### 🔍 Random Row (Index {rand_idx})")
             st.dataframe(X_sample)
+
+            st.write("### 📊 SHAP Explanation")
             explain_row(model, X_sample)
 
             st.subheader("📈 Metrics on Uploaded Data")
