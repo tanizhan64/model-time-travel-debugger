@@ -1,129 +1,108 @@
-# 🧠 Model-Time Travel Debugger (Streamlit + SHAP)
+# 🧠 Model-Time Travel Debugger
 
-A production-grade machine learning debugger built with **Streamlit**, **scikit-learn**, and **SHAP** to analyze and compare different versions of ML models on tabular data.
-
----
-
-## 📌 Overview
-
-This app allows you to:
-- 🔍 **Inspect model predictions** using SHAP explainability
-- 🔄 **Compare two model versions (v1 and v2)**
-- 📈 **Visualize prediction shifts and key driver changes**
-- 📊 **Track model performance metrics (MAE, RMSE, R²)**
-- ⚠️ **Detect feature drift (data quality change over time)**
-- 🔁 **Retrain models inside the UI**
-- 🧠 Run without external APIs (fully local, free to use)
+A professional-grade Streamlit app to **debug, compare, and explain prediction shifts** between two versions of a machine learning model. Visualize SHAP explanations, inspect metrics, monitor data drift, and retrain models — all from one clean UI.
 
 ---
 
-## 📂 Folder Structure
+## 🚀 Features
+
+| Section                     | What It Does                                                                 |
+|-----------------------------|------------------------------------------------------------------------------|
+| 🔍 **Row Picker**            | Select a row from your dataset to analyze                                   |
+| 📈 **Prediction**            | View model output for the selected row                                      |
+| 📊 **SHAP Explanation**      | Interactive waterfall plot to explain model reasoning                       |
+| 🧠 **Explain v1 vs v2 Shift** | Compare predictions and SHAP explanations across model versions              |
+| 📏 **Metrics + Drift (button)** | Check performance (MAE, RMSE, R²) and inspect feature distribution shifts    |
+| 🔁 **Retrain Models**         | Rebuild v1 and v2 from updated CSVs                                         |
+
+---
+
+## 📂 Project Structure
 
 ```
 model-time-travel-debugger/
-├── app.py                  # 🚀 Main Streamlit app
-├── requirements.txt        # 📦 Package dependencies
-├── README.md               # 📘 You're here!
-├── .streamlit/
-│   └── config.toml         # 🎨 UI theme
+├── app.py                          # Main Streamlit app (use final version)
+├── models/
+│   ├── model_v1.pkl
+│   └── model_v2.pkl
 ├── data/
-│   ├── housing_v1.csv      # 📊 Training data for model v1
-│   └── housing_v2.csv      # 📊 Training data for model v2
-└── models/
-    ├── model_v1.pkl        # 🧠 Trained model v1 (auto created)
-    └── model_v2.pkl        # 🧠 Trained model v2 (auto created)
+│   ├── housing_v1.csv              # Version 1 of dataset
+│   └── housing_v2.csv              # Version 2 of dataset
+├── requirements.txt
+└── .streamlit/
+    └── config.toml
 ```
 
 ---
 
-## 🚀 How to Run
+## 🧪 Sample Data (Structure)
 
-### 🔧 Local
+Both `housing_v1.csv` and `housing_v2.csv` must contain:
+
+```csv
+feature_1, feature_2, ..., feature_n, target
+```
+
+- `target` is the value the model learns to predict
+- Feature names can vary but must match between versions
+
+---
+
+## 🛠 Setup Instructions
+
+### 🔹 Local
 
 ```bash
+git clone https://github.com/yourusername/model-time-travel-debugger.git
+cd model-time-travel-debugger
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-> On first run, models will be trained and saved to `/models/`
+### 🔹 Streamlit Cloud
+
+1. Push to GitHub
+2. Go to [https://streamlit.io/cloud](https://streamlit.io/cloud)
+3. Click "New App"
+4. Select your repo and `app.py`
+5. 🎉 You're live!
 
 ---
 
-## 🌍 Deploy to Streamlit Cloud
+## 📊 Tech Stack
 
-1. Go to: https://streamlit.io/cloud
-2. Click **“New App”**
-3. Set repo to: `tanizhan64/model-time-travel-debugger`
-4. Set main file: `app.py`
-5. Click **Deploy**
-
----
-
-## 🔬 Phase Breakdown
-
-| Phase | Module | Description |
-|-------|--------|-------------|
-| ✅ 1 | **Prediction + SHAP Viewer** | Interactive row viewer with feature importance |
-| ✅ 2 | **Prediction Comparison Agent** | Compares predictions across model versions |
-| ✅ 3 | **Metrics + Drift Tracker** | Shows MAE, RMSE, R² and feature drift stats |
-| ✅ 4 | **UI + Retrain Panel** | Lets user retrain models and view results live |
+- **Frontend**: Streamlit
+- **Modeling**: scikit-learn (RandomForestRegressor)
+- **Explainability**: SHAP (`shap.Explainer`)
+- **Metrics**: MAE, RMSE, R²
 
 ---
 
-## 📈 Example Metrics Output
+## 🧠 Example Use Cases
 
-```text
-Model v1:
-  MAE  = 0.38
-  RMSE = 0.59
-  R²   = 0.83
-
-Model v2:
-  MAE  = 0.35
-  RMSE = 0.54
-  R²   = 0.86
-```
+- Debug model changes in production
+- Visualize data drift and feature impact
+- Explain ML results to stakeholders
+- Demo ML workflows in interviews
+- Build trust in model decisions
 
 ---
 
-## ⚠️ Feature Drift Output
+## ✅ Coming Soon (Ideas to Expand)
 
-| Feature   | Mean_v1 | Mean_v2 | Mean_Diff | Std_Diff |
-|-----------|---------|---------|-----------|----------|
-| AveRooms  | 5.38    | 6.01    | 0.63      | 0.21     |
-| MedInc    | 3.21    | 3.28    | 0.07      | 0.04     |
-
-> This helps detect if your model is using shifted data or if retraining had effects due to new distributions.
+- [ ] Upload your own CSVs directly
+- [ ] Add support for classification tasks
+- [ ] Save explanations and drift reports
+- [ ] Add model version history and leaderboard
 
 ---
 
-## 🎯 Use Cases
+## 👤 Author
 
-- ✅ Model upgrade QA
-- ✅ Local LLM tabular assistants
-- ✅ Drift-aware retraining pipelines
-- ✅ Explainable AI (XAI) demos
-- ✅ Resume / portfolio project
+Built by [@tanizhan64](https://github.com/tanizhan64) with ✨ guidance from Infinity King (AI teammate)
 
 ---
 
-## 🛠 Built With
+## 📜 License
 
-- [Streamlit](https://streamlit.io)
-- [scikit-learn](https://scikit-learn.org)
-- [SHAP](https://github.com/slundberg/shap)
-- [pandas](https://pandas.pydata.org/)
-- [matplotlib](https://matplotlib.org/)
-- [joblib](https://joblib.readthedocs.io/)
-
----
-
-## 📘 License
-
-MIT License — use freely, credit appreciated. Fork for your own models, add upload support or plug into your MLOps stack!
-
----
-
-## ✨ Author
-
-Created by [@tanizhan64](https://github.com/tanizhan64) — your friendly AI time traveler 🧠🕰️
+MIT License — use, fork, ship, and scale freely.
