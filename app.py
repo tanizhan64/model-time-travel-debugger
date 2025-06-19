@@ -1,5 +1,5 @@
 
-# 🧠 Model-Time Travel Debugger – Phase 3: Classification Support
+# 🧠 Model-Time Travel Debugger – Phase 3: Classification Support (Final Indent Fixed)
 
 import streamlit as st
 import pandas as pd
@@ -12,7 +12,7 @@ from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, accuracy_score, f1_score
 from sklearn.utils.multiclass import type_of_target
 
-st.set_page_config(page_title="Model-Time Travel Debugger (w/ Classification)", layout="wide")
+st.set_page_config(page_title="Model-Time Travel Debugger", layout="wide")
 
 MODEL_DIR = "models"
 EXAMPLE_DIR = "data"
@@ -74,11 +74,9 @@ def get_target_col(ver, df):
 # Header
 # ------------------------------
 st.title("🧠 Model-Time Travel Debugger (w/ Classification Support)")
-st.markdown("Supports both **Regression** and **Classification** targets automatically.")
-
+mode = st.radio("Choose Dataset Mode", ["📘 Example Dataset", "📁 Upload CSVs"])
 
 if mode == "📘 Example Dataset":
-    # Copy examples to upload folder to simulate flow
     for ver in ["v1", "v2"]:
         import shutil
         shutil.copyfile(f"{EXAMPLE_DIR}/housing_{ver}.csv", DATA_PATHS[ver])
@@ -86,20 +84,21 @@ if mode == "📘 Example Dataset":
             f.write("target")
         train_model(pd.read_csv(DATA_PATHS[ver]), ver, "target")
 
-for ver in ["v1", "v2"]:
-    st.markdown(f"### 🔄 Upload v{ver.upper()}")
-    uploaded = st.file_uploader(f"Upload CSV for {ver.upper()}", type=["csv"], key=ver)
-    target_col = st.text_input(f"Target column for {ver.upper()}", key=f"target_{ver}")
-    if uploaded and target_col:
-        df = pd.read_csv(uploaded)
-        if target_col in df.columns:
-            df.to_csv(DATA_PATHS[ver], index=False)
-            with open(TARGET_META[ver], "w") as f:
-                f.write(target_col)
-            train_model(df, ver, target_col)
-            st.success(f"✅ {ver.upper()} uploaded and model trained")
-        else:
-            st.error(f"'{target_col}' not found in CSV columns")
+if mode == "📁 Upload CSVs":
+    for ver in ["v1", "v2"]:
+        st.markdown(f"### 🔄 Upload v{ver.upper()}")
+        uploaded = st.file_uploader(f"Upload CSV for {ver.upper()}", type=["csv"], key=ver)
+        target_col = st.text_input(f"Target column for {ver.upper()}", key=f"target_{ver}")
+        if uploaded and target_col:
+            df = pd.read_csv(uploaded)
+            if target_col in df.columns:
+                df.to_csv(DATA_PATHS[ver], index=False)
+                with open(TARGET_META[ver], "w") as f:
+                    f.write(target_col)
+                train_model(df, ver, target_col)
+                st.success(f"✅ {ver.upper()} uploaded and model trained")
+            else:
+                st.error(f"'{target_col}' not found in CSV columns")
 
 if not all([os.path.exists(DATA_PATHS[v]) and os.path.exists(TARGET_META[v]) and os.path.exists(TYPE_META[v]) for v in ["v1", "v2"]]):
     st.warning("Please upload both CSVs and enter valid targets to proceed.")
@@ -176,17 +175,7 @@ if st.button("📈 View Metrics + Drift"):
 # 🔁 Retrain Both Models
 # -------------------------------
 if st.button("🔁 Retrain Models"):
-    
-if mode == "📘 Example Dataset":
-    # Copy examples to upload folder to simulate flow
     for ver in ["v1", "v2"]:
-        import shutil
-        shutil.copyfile(f"{EXAMPLE_DIR}/housing_{ver}.csv", DATA_PATHS[ver])
-        with open(TARGET_META[ver], "w") as f:
-            f.write("target")
-        train_model(pd.read_csv(DATA_PATHS[ver]), ver, "target")
-
-for ver in ["v1", "v2"]:
         df = get_data(ver)
         target = get_target_col(ver, df)
         train_model(df, ver, target)
