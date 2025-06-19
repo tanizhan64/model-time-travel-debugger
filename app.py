@@ -1,4 +1,4 @@
-# app.py — Streamlit Cloud Safe Version with SHAP Waterfall and Upload Support
+# app.py — Final: Includes Retrain + Highly Recommended Section
 
 import pandas as pd
 import numpy as np
@@ -27,6 +27,16 @@ DATA_PATHS = {
     "v1": f"{DATA_DIR}/housing_v1.csv",
     "v2": f"{DATA_DIR}/housing_v2.csv"
 }
+
+# --- Sidebar Recommended Section ---
+st.sidebar.title("🔥 Highly Recommended")
+st.sidebar.markdown("""
+- Use built-in example mode to understand SHAP
+- Upload your CSV to test custom model explainability
+- Click **🔬 Compare Metrics & Drift** to explore dataset shifts
+- Click **🔁 Retrain Models** to reset v1/v2 models
+- Works best on **tabular regression tasks**
+""")
 
 # --- Utils ---
 def train_and_save_model(data, version):
@@ -112,6 +122,12 @@ if source == "Use Example Housing Dataset":
         st.write("Model v2:", metrics_v2)
         st.subheader("📉 Feature Drift")
         st.dataframe(drift_df)
+
+    if st.button("🔁 Retrain Models"):
+        for ver in ["v1", "v2"]:
+            df = pd.read_csv(DATA_PATHS[ver])
+            train_and_save_model(df, ver)
+        st.success("✅ Models v1 and v2 retrained!")
 
 # -------------------------
 # 📤 Mode 2: Upload Dataset
