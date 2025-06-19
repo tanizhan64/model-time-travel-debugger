@@ -1,4 +1,4 @@
-# app.py —  user upload
+# app.py — Final Unified App with Upload Support and SHAP Fix
 
 import pandas as pd
 import numpy as np
@@ -6,6 +6,7 @@ import shap
 import joblib
 import streamlit as st
 import os
+import streamlit.components.v1 as components
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
@@ -46,9 +47,10 @@ def evaluate_model(model, X, y):
 def explain_row(model, X_sample):
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_sample)
-    force_html = shap.force_plot(explainer.expected_value, shap_values, X_sample, matplotlib=False)
-    st.components.v1.html(force_html.html(), height=300)
-
+    force_plot = shap.force_plot(
+        explainer.expected_value, shap_values, X_sample, matplotlib=False
+    )
+    components.html(force_plot.html(), height=300)
 
 # -------------------------
 # 🔘 Data Source Selector
