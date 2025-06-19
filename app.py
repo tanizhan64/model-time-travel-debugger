@@ -189,7 +189,7 @@ if st.button("📈 View Metrics + Drift"):
     st.dataframe(drift)
 
 # ------------------------------
-# 💾 Save Reports
+# 💾 Save SHAP + Drift Reports
 # ------------------------------
 if st.button("💾 Save SHAP + Drift Reports"):
     for ver in ["v1", "v2"]:
@@ -205,6 +205,13 @@ if st.button("💾 Save SHAP + Drift Reports"):
             "SHAP": shap_vals.values[0]
         })
         shap_df.to_csv(f"{REPORT_DIR}/shap_{ver}.csv", index=False)
+
+    # ✅ FIX: Redefine x1 and x2 locally here
+    df1 = get_data("v1")
+    df2 = get_data("v2")
+    t1 = get_target_col("v1", df1)
+    t2 = get_target_col("v2", df2)
+    x1, x2 = df1.drop(columns=[t1]), df2.drop(columns=[t2])
 
     drift = pd.DataFrame({
         "Feature": x1.columns,
