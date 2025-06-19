@@ -46,9 +46,9 @@ def evaluate_model(model, X, y):
 def explain_row(model, X_sample):
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_sample)
-    shap.initjs()
-    st_shap = shap.force_plot(explainer.expected_value, shap_values, X_sample, matplotlib=False)
-    st.components.v1.html(st_shap.html(), height=300)
+    force_html = shap.force_plot(explainer.expected_value, shap_values, X_sample, matplotlib=False)
+    st.components.v1.html(force_html.html(), height=300)
+
 
 # -------------------------
 # 🔘 Data Source Selector
