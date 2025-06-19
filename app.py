@@ -1,6 +1,7 @@
 # -------------------------------
-# Model-Time Travel Debugger (Pro) — with Clickable Metrics + Drift
+# Model-Time Travel Debugger (Final Version)
 # -------------------------------
+# Built for clarity, professional use, and Streamlit Cloud deployment.
 
 import pandas as pd
 import numpy as np
@@ -14,20 +15,20 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 st.set_page_config(page_title="Model-Time Travel Debugger", layout="wide")
 
+# -------------------------------
+# Setup
+# -------------------------------
 MODEL_DIR = "models"
 DATA_DIR = "data"
 os.makedirs(MODEL_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 
-MODEL_PATHS = {
-    "v1": f"{MODEL_DIR}/model_v1.pkl",
-    "v2": f"{MODEL_DIR}/model_v2.pkl"
-}
-DATA_PATHS = {
-    "v1": f"{DATA_DIR}/housing_v1.csv",
-    "v2": f"{DATA_DIR}/housing_v2.csv"
-}
+MODEL_PATHS = {f"v{i}": f"{MODEL_DIR}/model_v{i}.pkl" for i in [1, 2]}
+DATA_PATHS = {f"v{i}": f"{DATA_DIR}/housing_v{i}.csv" for i in [1, 2]}
 
+# -------------------------------
+# Functions
+# -------------------------------
 def train_and_save_model(data, version):
     X = data.drop(columns=["target"])
     y = data["target"]
@@ -64,28 +65,28 @@ def get_explanation_text(pred_v1, pred_v2, top_features):
     return explanation
 
 # -------------------------------
-# UI — Header
+# UI Header
 # -------------------------------
 st.title("🧠 Model-Time Travel Debugger")
 st.sidebar.header("📘 Instructions")
 st.sidebar.markdown("""
-1. Select a model and row  
-2. See prediction + SHAP explanation  
-3. Compare model versions  
-4. View metrics + drift in collapsible section  
-5. Retrain if needed  
+1. Select model + row  
+2. View prediction and SHAP  
+3. Click **Explain** for version difference  
+4. Expand **Metrics & Drift** for full evaluation  
+5. Click **Retrain** if needed  
 """)
 
 # -------------------------------
 # Ensure Models Exist
 # -------------------------------
-for ver in ["v1", "v2"]:
-    if not os.path.exists(MODEL_PATHS[ver]):
-        df = pd.read_csv(DATA_PATHS[ver])
-        train_and_save_model(df, ver)
+for version in ["v1", "v2"]:
+    if not os.path.exists(MODEL_PATHS[version]):
+        df = pd.read_csv(DATA_PATHS[version])
+        train_and_save_model(df, version)
 
 # -------------------------------
-# Select Model + Row
+# Select Version + Row
 # -------------------------------
 selected_version = st.selectbox("Select Model Version", ["v1", "v2"])
 df = pd.read_csv(DATA_PATHS[selected_version])
@@ -97,7 +98,7 @@ row_idx = st.slider("Select Row Index", 0, len(X)-1, 0)
 X_sample = X.iloc[[row_idx]]
 
 # -------------------------------
-# Display Input + Prediction
+# Input + Prediction
 # -------------------------------
 st.write("### 🔍 Selected Input Row")
 st.dataframe(X_sample)
@@ -107,72 +108,70 @@ pred = model.predict(X_sample)[0]
 st.success(f"Model {selected_version} predicts: `{pred:.2f}`")
 
 # -------------------------------
-# SHAP Visualization
+# SHAP
 # -------------------------------
 explain_row(model, X_sample)
 
 # -------------------------------
-# Explain Model v1 vs v2 Shift
+# Explain Shift
 # -------------------------------
 if st.button("🧠 Explain v1 vs v2 Shift"):
+    model_v1 = joblib.load(MODEL_PATHS["v1"])
+    model_v2 = joblib.load(MODEL_PATHS["v2"])
     df_v1 = pd.read_csv(DATA_PATHS["v1"])
     df_v2 = pd.read_csv(DATA_PATHS["v2"])
     X1, y1 = df_v1.drop(columns=["target"]), df_v1["target"]
     X2, y2 = df_v2.drop(columns=["target"]), df_v2["target"]
-    model_v1 = joblib.load(MODEL_PATHS["v1"])
-    model_v2 = joblib.load(MODEL_PATHS["v2"])
 
     pred_v1 = model_v1.predict(X_sample)[0]
     pred_v2 = model_v2.predict(X_sample)[0]
 
     shap_v1 = shap.Explainer(model_v1)(X_sample)
     shap_v2 = shap.Explainer(model_v2)(X_sample)
-    delta = shap_v2.values[0] - shap_v1.values[0]
-    top_idx = np.argsort(np.abs(delta))[::-1][:3]
-    top_features = [(X.columns[i], delta[i]) for i in top_idx]
+    diff = shap_v2.values[0] - shap_v1.values[0]
+    top_idx = np.argsort(np.abs(diff))[::-1][:3]
+    top_features = [(X.columns[i], diff[i]) for i in top_idx]
 
-    st.markdown("### 🗣️ Explanation")
+    st.markdown("### 🗣️ Version Explanation")
     st.info(get_explanation_text(pred_v1, pred_v2, top_features))
 
 # -------------------------------
-# Metrics + Drift: Collapsible
+# Metrics + Drift: Click to View
 # -------------------------------
-with st.expander("📊 Metrics + Feature Drift", expanded=False):
-    st.markdown("### 📏 Model Evaluation Metrics")
-
+with st.expander("📈 View: Model Metrics & Feature Drift", expanded=False):
+    model_v1 = joblib.load(MODEL_PATHS["v1"])
+    model_v2 = joblib.load(MODEL_PATHS["v2"])
     df_v1 = pd.read_csv(DATA_PATHS["v1"])
     df_v2 = pd.read_csv(DATA_PATHS["v2"])
     X1, y1 = df_v1.drop(columns=["target"]), df_v1["target"]
     X2, y2 = df_v2.drop(columns=["target"]), df_v2["target"]
-    model_v1 = joblib.load(MODEL_PATHS["v1"])
-    model_v2 = joblib.load(MODEL_PATHS["v2"])
 
+    st.markdown("### 📏 Evaluation Metrics")
     metrics_v1 = evaluate_model(model_v1, X1, y1)
     metrics_v2 = evaluate_model(model_v2, X2, y2)
 
-    st.markdown("#### Model v1")
-    for k, v in metrics_v1.items():
-        st.write(f"- {k}: `{v:.4f}`")
+    st.markdown("#### 🧪 Model v1")
+    for key, value in metrics_v1.items():
+        st.markdown(f"- **{key}**: `{value:.4f}`")
 
-    st.markdown("#### Model v2")
-    for k, v in metrics_v2.items():
-        st.write(f"- {k}: `{v:.4f}`")
+    st.markdown("#### 🧪 Model v2")
+    for key, value in metrics_v2.items():
+        st.markdown(f"- **{key}**: `{value:.4f}`")
 
+    st.markdown("### 🔄 Feature Drift Table")
     drift_df = pd.DataFrame({
         "Feature": X1.columns,
         "Mean_v1": X1.mean().values,
         "Mean_v2": X2.mean().values,
         "ΔMean": X2.mean().values - X1.mean().values
     })
-
-    st.markdown("### 🔄 Feature Drift Table")
     st.dataframe(drift_df)
 
 # -------------------------------
-# Retrain Models
+# Retrain
 # -------------------------------
 if st.button("🔁 Retrain Both Models"):
-    for ver in ["v1", "v2"]:
-        df = pd.read_csv(DATA_PATHS[ver])
-        train_and_save_model(df, ver)
-    st.success("✅ Models v1 and v2 retrained.")
+    for version in ["v1", "v2"]:
+        df = pd.read_csv(DATA_PATHS[version])
+        train_and_save_model(df, version)
+    st.success("✅ Models retrained.")
