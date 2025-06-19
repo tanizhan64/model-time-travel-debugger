@@ -1,5 +1,4 @@
-
-# 🧠 Model-Time Travel Debugger – Phase 3: Classification Support (Final Indent Fixed)
+# 🧠 Model-Time Travel Debugger – Phase 4: Save Reports + Classification
 
 import streamlit as st
 import pandas as pd
@@ -12,20 +11,30 @@ from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, accuracy_score, f1_score
 from sklearn.utils.multiclass import type_of_target
 
+# ------------------------------
+# 📦 Setup
+# ------------------------------
 st.set_page_config(page_title="Model-Time Travel Debugger", layout="wide")
 
 MODEL_DIR = "models"
 EXAMPLE_DIR = "data"
 UPLOAD_DIR = "user_data"
+REPORT_DIR = "reports"
+
 os.makedirs(MODEL_DIR, exist_ok=True)
 os.makedirs(EXAMPLE_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(REPORT_DIR, exist_ok=True)
 
 MODEL_PATHS = {f"v{i}": f"{MODEL_DIR}/model_v{i}.pkl" for i in [1, 2]}
 DATA_PATHS = {f"v{i}": f"{UPLOAD_DIR}/upload_v{i}.csv" for i in [1, 2]}
 TARGET_META = {f"v{i}": f"{UPLOAD_DIR}/target_v{i}.txt" for i in [1, 2]}
 TYPE_META = {f"v{i}": f"{UPLOAD_DIR}/type_v{i}.txt" for i in [1, 2]}
 
+
+# ------------------------------
+# 🧠 Utilities
+# ------------------------------
 def detect_task_type(y):
     return "classification" if type_of_target(y) in ["binary", "multiclass"] else "regression"
 
@@ -70,12 +79,14 @@ def get_data(ver):
 def get_target_col(ver, df):
     return open(TARGET_META[ver]).read().strip()
 
+
 # ------------------------------
-# Header
+# 🧠 App Interface
 # ------------------------------
-st.title("🧠 Model-Time Travel Debugger (w/ Classification Support)")
+st.title("🧠 Model-Time Travel Debugger (Phases 1–4 Complete)")
 mode = st.radio("Choose Dataset Mode", ["📘 Example Dataset", "📁 Upload CSVs"])
 
+# Load data
 if mode == "📘 Example Dataset":
     for ver in ["v1", "v2"]:
         import shutil
@@ -100,10 +111,14 @@ if mode == "📁 Upload CSVs":
             else:
                 st.error(f"'{target_col}' not found in CSV columns")
 
+# Validate data
 if not all([os.path.exists(DATA_PATHS[v]) and os.path.exists(TARGET_META[v]) and os.path.exists(TYPE_META[v]) for v in ["v1", "v2"]]):
     st.warning("Please upload both CSVs and enter valid targets to proceed.")
     st.stop()
 
+# ------------------------------
+# 🎯 Predict + SHAP
+# ------------------------------
 selected_version = st.selectbox("Select Model Version", ["v1", "v2"])
 df = get_data(selected_version)
 target_col = get_target_col(selected_version, df)
@@ -124,24 +139,26 @@ st.success(f"Model predicts: `{pred}`")
 
 explain_row(model, X_sample)
 
+
+# ------------------------------
+# 📊 Compare v1 vs v2
+# ------------------------------
 if st.button("🧠 Explain v1 vs v2"):
+    df1, df2 = get_data("v1"), get_data("v2")
+    t1, t2 = get_target_col("v1", df1), get_target_col("v2", df2)
+    model1, model2 = joblib.load(MODEL_PATHS["v1"]), joblib.load(MODEL_PATHS["v2"])
     X_sample = X.iloc[[row]]
-    df1 = get_data("v1")
-    df2 = get_data("v2")
-    t1 = get_target_col("v1", df1)
-    t2 = get_target_col("v2", df2)
-    model1 = joblib.load(MODEL_PATHS["v1"])
-    model2 = joblib.load(MODEL_PATHS["v2"])
-    pred1 = model1.predict(X_sample)[0]
-    pred2 = model2.predict(X_sample)[0]
-    shap1 = shap.Explainer(model1)(X_sample)
-    shap2 = shap.Explainer(model2)(X_sample)
+    shap1, shap2 = shap.Explainer(model1)(X_sample), shap.Explainer(model2)(X_sample)
     diff = shap2.values[0] - shap1.values[0]
     top = np.argsort(np.abs(diff))[::-1][:3]
     for i in top:
         f = X.columns[i]
         st.write(f"**{f}**: `{shap1.values[0][i]:.3f}` → `{shap2.values[0][i]:.3f}`")
 
+
+# ------------------------------
+# 📏 Metrics + Drift
+# ------------------------------
 if st.button("📈 View Metrics + Drift"):
     df1 = get_data("v1")
     df2 = get_data("v2")
@@ -171,12 +188,39 @@ if st.button("📈 View Metrics + Drift"):
     })
     st.dataframe(drift)
 
-# -------------------------------
-# 🔁 Retrain Both Models
-# -------------------------------
+# ------------------------------
+# 💾 Save Reports
+# ------------------------------
+if st.button("💾 Save SHAP + Drift Reports"):
+    for ver in ["v1", "v2"]:
+        model = joblib.load(MODEL_PATHS[ver])
+        df = get_data(ver)
+        target = get_target_col(ver, df)
+        X = df.drop(columns=[target])
+        X_sample = X.iloc[[row]]
+        explainer = shap.Explainer(model)
+        shap_vals = explainer(X_sample)
+        shap_df = pd.DataFrame({
+            "Feature": X.columns,
+            "SHAP": shap_vals.values[0]
+        })
+        shap_df.to_csv(f"{REPORT_DIR}/shap_{ver}.csv", index=False)
+
+    drift = pd.DataFrame({
+        "Feature": x1.columns,
+        "Mean_v1": x1.mean(),
+        "Mean_v2": x2.mean(),
+        "ΔMean": x2.mean() - x1.mean()
+    })
+    drift.to_csv(f"{REPORT_DIR}/feature_drift.csv", index=False)
+    st.success("✅ SHAP + Drift reports saved to /reports/")
+
+# ------------------------------
+# 🔁 Retrain Models
+# ------------------------------
 if st.button("🔁 Retrain Models"):
     for ver in ["v1", "v2"]:
         df = get_data(ver)
         target = get_target_col(ver, df)
         train_model(df, ver, target)
-    st.success("✅ Models retrained based on latest data and targets.")
+    st.success("✅ Models retrained from current data.")
