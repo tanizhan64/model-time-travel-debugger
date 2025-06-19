@@ -1,4 +1,10 @@
-# app.py — Metrics + Drift Outside Explain Block, Unified Section
+# -------------------------------
+# Model-Time Travel Debugger (Pro)
+# -------------------------------
+# Author: Asta | AI Partner: Infinity King
+# Description: Visualize, explain, and compare ML model version predictions using SHAP.
+# Supports prediction shift insight, metrics comparison, and data drift analysis.
+# Designed for Streamlit Cloud deployment — clean UX, full pro layout.
 
 import pandas as pd
 import numpy as np
@@ -10,8 +16,14 @@ import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
+# -------------------------------
+# Streamlit Page Config
+# -------------------------------
 st.set_page_config(page_title="Model-Time Travel Debugger", layout="wide")
 
+# -------------------------------
+# Paths
+# -------------------------------
 MODEL_DIR = "models"
 DATA_DIR = "data"
 os.makedirs(MODEL_DIR, exist_ok=True)
@@ -26,6 +38,9 @@ DATA_PATHS = {
     "v2": f"{DATA_DIR}/housing_v2.csv"
 }
 
+# -------------------------------
+# Utilities
+# -------------------------------
 def train_and_save_model(data, version):
     X = data.drop(columns=["target"])
     y = data["target"]
@@ -51,35 +66,40 @@ def explain_row(model, X_sample):
     st.pyplot(fig)
 
 def get_explanation_text(pred_v1, pred_v2, top_features):
-    change = pred_v2 - pred_v1
-    direction = "increased" if change > 0 else "decreased"
-    pct_change = abs(change) / (abs(pred_v1) + 1e-8) * 100
-    txt = f"🔎 The prediction has **{direction} by {pct_change:.2f}%**, from `{pred_v1:.2f}` to `{pred_v2:.2f}`.\n\n"
-    txt += "Top changed feature importance between versions:\n"
-    for feat, delta in top_features:
-        arrow = "⬆️" if delta > 0 else "⬇️"
-        txt += f"- {arrow} `{feat}` changed by `{delta:.3f}` SHAP points\n"
-    return txt
+    delta = pred_v2 - pred_v1
+    direction = "increased" if delta > 0 else "decreased"
+    percent = abs(delta) / (abs(pred_v1) + 1e-8) * 100
+    explanation = f"🔍 Prediction has **{direction} by {percent:.2f}%**, from `{pred_v1:.2f}` to `{pred_v2:.2f}`.\n\n"
+    explanation += "Top changing features:\n"
+    for feature, value in top_features:
+        arrow = "⬆️" if value > 0 else "⬇️"
+        explanation += f"- {arrow} `{feature}` changed SHAP by `{value:.3f}`\n"
+    return explanation
 
-# -----------------------
-# UI Start
-# -----------------------
+# -------------------------------
+# UI — Header
+# -------------------------------
 st.title("🧠 Model-Time Travel Debugger")
-st.sidebar.title("🔥 Recommended Flow")
+st.sidebar.header("📘 Instructions")
 st.sidebar.markdown("""
-- Select a model and row
-- View prediction + SHAP
-- Use 'Explain' for version comparison
-- See metrics + drift below
-- Retrain if needed
+1. Select a model and row  
+2. See prediction + SHAP explanation  
+3. Compare model versions  
+4. Review metrics + drift  
+5. Retrain if data changed  
 """)
 
-# Ensure models exist
+# -------------------------------
+# Ensure Models Exist
+# -------------------------------
 for ver in ["v1", "v2"]:
     if not os.path.exists(MODEL_PATHS[ver]):
         df = pd.read_csv(DATA_PATHS[ver])
         train_and_save_model(df, ver)
 
+# -------------------------------
+# Select Model + Row
+# -------------------------------
 selected_version = st.selectbox("Select Model Version", ["v1", "v2"])
 df = pd.read_csv(DATA_PATHS[selected_version])
 model = joblib.load(MODEL_PATHS[selected_version])
@@ -88,15 +108,25 @@ y = df["target"]
 
 row_idx = st.slider("Select Row Index", 0, len(X)-1, 0)
 X_sample = X.iloc[[row_idx]]
+
+# -------------------------------
+# Display Input + Prediction
+# -------------------------------
 st.write("### 🔍 Selected Input Row")
 st.dataframe(X_sample)
 
 st.write("### 📈 Prediction")
 pred = model.predict(X_sample)[0]
-st.success(f"Prediction: `{pred:.2f}`")
+st.success(f"Model {selected_version} predicts: `{pred:.2f}`")
 
+# -------------------------------
+# SHAP Visualization
+# -------------------------------
 explain_row(model, X_sample)
 
+# -------------------------------
+# Explain Model v1 vs v2 Shift
+# -------------------------------
 if st.button("🧠 Explain v1 vs v2 Shift"):
     df_v1 = pd.read_csv(DATA_PATHS["v1"])
     df_v2 = pd.read_csv(DATA_PATHS["v2"])
@@ -108,21 +138,18 @@ if st.button("🧠 Explain v1 vs v2 Shift"):
     pred_v1 = model_v1.predict(X_sample)[0]
     pred_v2 = model_v2.predict(X_sample)[0]
 
-    explainer_v1 = shap.Explainer(model_v1)
-    explainer_v2 = shap.Explainer(model_v2)
-    shap_v1 = explainer_v1(X_sample)
-    shap_v2 = explainer_v2(X_sample)
+    shap_v1 = shap.Explainer(model_v1)(X_sample)
+    shap_v2 = shap.Explainer(model_v2)(X_sample)
+    delta = shap_v2.values[0] - shap_v1.values[0]
+    top_idx = np.argsort(np.abs(delta))[::-1][:3]
+    top_features = [(X.columns[i], delta[i]) for i in top_idx]
 
-    diffs = shap_v2.values[0] - shap_v1.values[0]
-    top_idx = np.argsort(np.abs(diffs))[::-1][:3]
-    top_features = [(X.columns[i], diffs[i]) for i in top_idx]
-
-    st.markdown("### 🗣️ Natural Explanation")
+    st.markdown("### 🗣️ Explanation")
     st.info(get_explanation_text(pred_v1, pred_v2, top_features))
 
-# -----------------------
-# 🔍 Metrics + Drift (Always Visible)
-# -----------------------
+# -------------------------------
+# Show Metrics + Drift (Always Visible)
+# -------------------------------
 df_v1 = pd.read_csv(DATA_PATHS["v1"])
 df_v2 = pd.read_csv(DATA_PATHS["v2"])
 X1, y1 = df_v1.drop(columns=["target"]), df_v1["target"]
@@ -143,17 +170,18 @@ st.subheader("📊 Metrics + Feature Drift")
 col1, col2 = st.columns(2)
 with col1:
     st.markdown("**Model v1 Metrics**")
-    st.write(metrics_v1)
+    st.json(metrics_v1)
 with col2:
     st.markdown("**Model v2 Metrics**")
-    st.write(metrics_v2)
+    st.json(metrics_v2)
+
 st.dataframe(drift_df)
 
-# -----------------------
-# Retrain
-# -----------------------
-if st.button("🔁 Retrain v1 & v2 Models"):
+# -------------------------------
+# Retrain Models
+# -------------------------------
+if st.button("🔁 Retrain Both Models"):
     for ver in ["v1", "v2"]:
         df = pd.read_csv(DATA_PATHS[ver])
         train_and_save_model(df, ver)
-    st.success("✅ Models retrained.")
+    st.success("✅ Models v1 and v2 retrained.")
