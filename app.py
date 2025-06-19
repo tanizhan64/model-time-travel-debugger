@@ -1,4 +1,4 @@
-# app.py — Separated Metrics + Drift Sections
+# app.py — Metrics + Drift Outside Explain Block, Unified Section
 
 import pandas as pd
 import numpy as np
@@ -38,7 +38,7 @@ def evaluate_model(model, X, y):
     preds = model.predict(X)
     return {
         "MAE": mean_absolute_error(y, preds),
-        "RMSE": np.sqrt(mean_squared_error(y, preds)),  # Manual sqrt
+        "RMSE": np.sqrt(mean_squared_error(y, preds)),
         "R2": r2_score(y, preds)
     }
 
@@ -61,16 +61,20 @@ def get_explanation_text(pred_v1, pred_v2, top_features):
         txt += f"- {arrow} `{feat}` changed by `{delta:.3f}` SHAP points\n"
     return txt
 
+# -----------------------
+# UI Start
+# -----------------------
 st.title("🧠 Model-Time Travel Debugger")
-st.sidebar.title("🔥 Highly Recommended")
+st.sidebar.title("🔥 Recommended Flow")
 st.sidebar.markdown("""
-- Use built-in housing demo
 - Select a model and row
-- Explain button shows version differences
-- Metrics and drift are in separate sections
-- Retrain button refreshes models
+- View prediction + SHAP
+- Use 'Explain' for version comparison
+- See metrics + drift below
+- Retrain if needed
 """)
 
+# Ensure models exist
 for ver in ["v1", "v2"]:
     if not os.path.exists(MODEL_PATHS[ver]):
         df = pd.read_csv(DATA_PATHS[ver])
@@ -116,22 +120,38 @@ if st.button("🧠 Explain v1 vs v2 Shift"):
     st.markdown("### 🗣️ Natural Explanation")
     st.info(get_explanation_text(pred_v1, pred_v2, top_features))
 
-    metrics_v1 = evaluate_model(model_v1, X1, y1)
-    metrics_v2 = evaluate_model(model_v2, X2, y2)
-    drift_df = pd.DataFrame({
-        "Feature": X1.columns,
-        "Mean_v1": X1.mean().values,
-        "Mean_v2": X2.mean().values,
-        "ΔMean": X2.mean().values - X1.mean().values
-    })
+# -----------------------
+# 🔍 Metrics + Drift (Always Visible)
+# -----------------------
+df_v1 = pd.read_csv(DATA_PATHS["v1"])
+df_v2 = pd.read_csv(DATA_PATHS["v2"])
+X1, y1 = df_v1.drop(columns=["target"]), df_v1["target"]
+X2, y2 = df_v2.drop(columns=["target"]), df_v2["target"]
+model_v1 = joblib.load(MODEL_PATHS["v1"])
+model_v2 = joblib.load(MODEL_PATHS["v2"])
 
-    with st.expander("📊 Metrics Comparison"):
-        st.write("Model v1:", metrics_v1)
-        st.write("Model v2:", metrics_v2)
+metrics_v1 = evaluate_model(model_v1, X1, y1)
+metrics_v2 = evaluate_model(model_v2, X2, y2)
+drift_df = pd.DataFrame({
+    "Feature": X1.columns,
+    "Mean_v1": X1.mean().values,
+    "Mean_v2": X2.mean().values,
+    "ΔMean": X2.mean().values - X1.mean().values
+})
 
-    with st.expander("📉 Feature Drift"):
-        st.dataframe(drift_df)
+st.subheader("📊 Metrics + Feature Drift")
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown("**Model v1 Metrics**")
+    st.write(metrics_v1)
+with col2:
+    st.markdown("**Model v2 Metrics**")
+    st.write(metrics_v2)
+st.dataframe(drift_df)
 
+# -----------------------
+# Retrain
+# -----------------------
 if st.button("🔁 Retrain v1 & v2 Models"):
     for ver in ["v1", "v2"]:
         df = pd.read_csv(DATA_PATHS[ver])
