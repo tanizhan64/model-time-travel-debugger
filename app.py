@@ -161,3 +161,13 @@ if st.button("📈 View Metrics + Drift"):
         "ΔMean": x2.mean() - x1.mean()
     })
     st.dataframe(drift)
+
+# -------------------------------
+# 🔁 Retrain Both Models
+# -------------------------------
+if st.button("🔁 Retrain Models"):
+    for ver in ["v1", "v2"]:
+        df = get_data(ver)
+        target = get_target_col(ver, df)
+        train_model(df, ver, target)
+    st.success("✅ Models retrained based on latest data and targets.")
