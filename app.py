@@ -1,4 +1,5 @@
-# 🧠 Model-Time Travel Debugger — With Target Column Selection
+
+# 🧠 Model-Time Travel Debugger — Text Input for Target Column
 
 import pandas as pd
 import numpy as np
@@ -62,25 +63,27 @@ def get_explanation_text(pred_v1, pred_v2, top_features):
 # -------------------------------
 # Header
 # -------------------------------
-st.title("🧠 Model-Time Travel Debugger (Target Column Selectable)")
+st.title("🧠 Model-Time Travel Debugger (Target via Text Input)")
 data_mode = st.radio("📦 Choose Data Mode", ["📘 Use Example Dataset", "📁 Upload Your Own CSVs"])
 
 # -------------------------------
-# Upload Mode: Select target column
+# Upload Mode: Target Text Input
 # -------------------------------
 if data_mode == "📁 Upload Your Own CSVs":
     for ver in ["v1", "v2"]:
         uploaded = st.sidebar.file_uploader(f"Upload CSV for {ver.upper()}", type=["csv"], key=ver)
         if uploaded:
             df = pd.read_csv(uploaded)
-            st.sidebar.markdown(f"**Select Target Column for {ver.upper()}**")
-            target_col = st.sidebar.selectbox(f"Target for {ver.upper()}", df.columns, key=f"target_{ver}")
-            if target_col:
+            st.sidebar.markdown(f"**Enter Target Column Name for {ver.upper()}**")
+            target_col = st.sidebar.text_input(f"Target column for {ver.upper()}", key=f"target_{ver}")
+            if target_col and target_col in df.columns:
                 df.to_csv(UPLOAD_PATHS[ver], index=False)
                 with open(TARGET_META[ver], "w") as f:
                     f.write(target_col)
                 train_and_save_model(df, ver, target_col)
                 st.sidebar.success(f"✅ {ver.upper()} trained with target: `{target_col}`")
+            elif target_col:
+                st.sidebar.error(f"❌ `{target_col}` not found in columns: {', '.join(df.columns)}")
 
 # -------------------------------
 # Load Data
@@ -97,7 +100,7 @@ def get_target_col(ver, df):
 
 # Block if upload mode but no files yet
 if data_mode == "📁 Upload Your Own CSVs" and not all(os.path.exists(UPLOAD_PATHS[v]) and os.path.exists(TARGET_META[v]) for v in ["v1", "v2"]):
-    st.warning("Please upload CSVs for both v1 and v2 and select a target column.")
+    st.warning("Please upload both CSVs and enter valid target column names.")
     st.stop()
 
 selected_version = st.selectbox("Select Model Version", ["v1", "v2"])
