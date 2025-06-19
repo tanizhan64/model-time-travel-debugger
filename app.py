@@ -1,174 +1,73 @@
-# model_time_travel_debugger
+# Extended version with Upload + Retrain
 
-import os
-import joblib
 import pandas as pd
 import numpy as np
 import shap
+import joblib
 import streamlit as st
-from streamlit.components.v1 import html
+import os
+from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-# --------------------------
-# Configuration
-# --------------------------
 MODEL_DIR = "models"
-DATA_PATHS = {
-    "v1": "data/housing_v1.csv",
-    "v2": "data/housing_v2.csv"
-}
-MODEL_PATHS = {
-    "v1": f"{MODEL_DIR}/model_v1.pkl",
-    "v2": f"{MODEL_DIR}/model_v2.pkl"
-}
+USER_DATA_PATH = "data/user_upload.csv"
+USER_MODEL_PATH = f"{MODEL_DIR}/model_user.pkl"
 
-# --------------------------
-# Utility Functions
-# --------------------------
-def load_data(version):
-    return pd.read_csv(DATA_PATHS[version])
+os.makedirs("models", exist_ok=True)
+os.makedirs("data", exist_ok=True)
 
-def train_model(data, version):
-    X = data.drop(columns=["target"])
-    y = data["target"]
-    model = RandomForestRegressor(random_state=42)
-    model.fit(X, y)
-    joblib.dump(model, MODEL_PATHS[version])
-    return model
+st.title("🧠 Model-Time Travel Debugger (With Upload Support)")
 
-def load_model(version):
-    return joblib.load(MODEL_PATHS[version])
+# -----------------------------
+# Upload section
+# -----------------------------
+st.header("📤 Upload Custom Dataset")
+uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
 
-def explain_prediction(model, X_sample):
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(X_sample)
-    return shap_values, explainer
+if uploaded_file is not None:
+    df_upload = pd.read_csv(uploaded_file)
+    df_upload.to_csv(USER_DATA_PATH, index=False)
+    st.success("✅ File uploaded and saved.")
 
-def get_top_shifted_features(shap_v1, shap_v2, feature_names, top_n=3):
-    diff = np.abs(shap_v2 - shap_v1)
-    indices = np.argsort(diff[0])[::-1][:top_n]
-    return [(feature_names[i], shap_v1[0][i], shap_v2[0][i]) for i in indices]
+    st.write("### Preview Uploaded Data")
+    st.dataframe(df_upload.head())
 
-def generate_explanation(input_row, pred_v1, pred_v2, shifted_features):
-    direction = "increased" if pred_v2 > pred_v1 else "decreased"
-    change = abs(pred_v2 - pred_v1) / pred_v1 * 100
-    lines = [f"🔁 Prediction **{direction}** by {change:.2f}% → from {pred_v1:.2f} to {pred_v2:.2f}."]
-    lines.append("🔍 Top changed features:")
-    for name, v1, v2 in shifted_features:
-        shift = "↑" if abs(v2) > abs(v1) else "↓"
-        lines.append(f"- `{name}` importance {shift}: {v1:.3f} → {v2:.3f}")
-    return "\n".join(lines)
+    # Target column selection
+    with st.form("target_form"):
+        target_col = st.selectbox("🎯 Select Target Column", df_upload.columns)
+        submitted = st.form_submit_button("Train Model on Uploaded Data")
 
-def evaluate_model(model, X, y):
-    preds = model.predict(X)
-    return {
-        "MAE": mean_absolute_error(y, preds),
-        "RMSE": mean_squared_error(y, preds) ** 0.5,  # manually compute sqrt
-        "R2": r2_score(y, preds)
-    }
+    if submitted:
+        X = df_upload.drop(columns=[target_col])
+        y = df_upload[target_col]
 
-def compare_feature_stats(df1, df2):
-    drift = []
-    for col in df1.columns:
-        if col == "target": continue
-        mean1, mean2 = df1[col].mean(), df2[col].mean()
-        std1, std2 = df1[col].std(), df2[col].std()
-        drift.append({
-            "feature": col,
-            "mean_v1": mean1, "mean_v2": mean2,
-            "mean_diff": abs(mean2 - mean1),
-            "std_diff": abs(std2 - std1)
+        # Train model
+        model = RandomForestRegressor(random_state=42)
+        model.fit(X, y)
+        joblib.dump(model, USER_MODEL_PATH)
+        st.success("✅ Model trained and saved as model_user.pkl")
+
+        # Show SHAP explanation for random row
+        st.subheader("🔍 SHAP Explanation (Random Row)")
+        sample_idx = np.random.randint(0, len(X))
+        row = X.iloc[[sample_idx]]
+        st.write("Row Index:", sample_idx)
+        st.write(row)
+
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(row)
+        shap.initjs()
+        st_shap = shap.force_plot(explainer.expected_value, shap_values, row, matplotlib=False)
+        st.components.v1.html(st_shap.html(), height=300)
+
+        # Metrics on full uploaded dataset
+        preds = model.predict(X)
+        st.subheader("📈 Model Evaluation Metrics")
+        st.write({
+            "MAE": mean_absolute_error(y, preds),
+            "RMSE": mean_squared_error(y, preds) ** 0.5,
+            "R2": r2_score(y, preds)
         })
-    return pd.DataFrame(drift).sort_values(by="mean_diff", ascending=False)
-
-# --------------------------
-# Ensure Models Exist
-# --------------------------
-if not os.path.exists(MODEL_DIR):
-    os.makedirs(MODEL_DIR)
-
-if not os.path.exists(MODEL_PATHS["v1"]) or not os.path.exists(MODEL_PATHS["v2"]):
-    df_v1 = load_data("v1")
-    df_v2 = load_data("v2")
-    train_model(df_v1, "v1")
-    train_model(df_v2, "v2")
-
-# --------------------------
-# Streamlit UI
-# --------------------------
-st.set_page_config(page_title="Model-Time Travel Debugger", layout="wide")
-st.title("🧠 Model-Time Travel: ML Version Debugger")
-
-selected_version = st.selectbox("Select Model Version", ["v1", "v2"])
-data = load_data(selected_version)
-model = load_model(selected_version)
-
-sample_idx = st.slider("Select Row Index", 0, len(data) - 1, 0)
-X = data.drop(columns=["target"])
-X_sample = X.iloc[[sample_idx]]
-
-st.write("### 🔍 Input Features")
-st.write(X_sample)
-
-pred = model.predict(X_sample)[0]
-st.write("### 📈 Model Prediction")
-st.success(f"{pred:.2f}")
-
-st.write("### 📊 SHAP Explanation (Bar Chart)")
-shap_values, explainer = explain_prediction(model, X_sample)
-shap.summary_plot(shap_values, X_sample, plot_type="bar", show=False)
-import matplotlib.pyplot as plt
-fig = plt.gcf()
-st.pyplot(fig)
-
-# --------------------------
-# Phase 2: Explain Change
-# --------------------------
-if st.button("🧠 Explain Change (v1 vs v2)"):
-    model_v1 = load_model("v1")
-    model_v2 = load_model("v2")
-
-    shap_v1, _ = explain_prediction(model_v1, X_sample)
-    shap_v2, _ = explain_prediction(model_v2, X_sample)
-    pred_v1 = model_v1.predict(X_sample)[0]
-    pred_v2 = model_v2.predict(X_sample)[0]
-
-    shifted = get_top_shifted_features(shap_v1, shap_v2, X_sample.columns)
-    explanation = generate_explanation(X_sample.to_dict(orient='records')[0], pred_v1, pred_v2, shifted)
-
-    st.markdown("### 🤖 Local Agent Explanation")
-    st.info(explanation)
-
-# --------------------------
-# Phase 3: Metrics + Drift
-# --------------------------
-if st.button("📊 Compare Model Metrics and Drift"):
-    df_v1 = load_data("v1")
-    df_v2 = load_data("v2")
-
-    model_v1 = load_model("v1")
-    model_v2 = load_model("v2")
-
-    X1, y1 = df_v1.drop(columns=["target"]), df_v1["target"]
-    X2, y2 = df_v2.drop(columns=["target"]), df_v2["target"]
-
-    metrics_v1 = evaluate_model(model_v1, X1, y1)
-    metrics_v2 = evaluate_model(model_v2, X2, y2)
-
-    st.subheader("📈 Model Evaluation")
-    st.write("Model v1:", metrics_v1)
-    st.write("Model v2:", metrics_v2)
-
-    st.subheader("📉 Feature Drift (mean + std)")
-    drift_df = compare_feature_stats(df_v1, df_v2)
-    st.dataframe(drift_df)
-
-# --------------------------
-# Phase 4: Retraining
-# --------------------------
-if st.button("🔁 Retrain Both Models"):
-    for ver in ["v1", "v2"]:
-        df = load_data(ver)
-        train_model(df, ver)
-    st.success("✅ Models retrained and saved.")
+else:
+    st.info("👆 Upload a CSV file to get started.")
