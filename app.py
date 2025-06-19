@@ -76,6 +76,16 @@ def get_target_col(ver, df):
 st.title("🧠 Model-Time Travel Debugger (w/ Classification Support)")
 st.markdown("Supports both **Regression** and **Classification** targets automatically.")
 
+
+if mode == "📘 Example Dataset":
+    # Copy examples to upload folder to simulate flow
+    for ver in ["v1", "v2"]:
+        import shutil
+        shutil.copyfile(f"{EXAMPLE_DIR}/housing_{ver}.csv", DATA_PATHS[ver])
+        with open(TARGET_META[ver], "w") as f:
+            f.write("target")
+        train_model(pd.read_csv(DATA_PATHS[ver]), ver, "target")
+
 for ver in ["v1", "v2"]:
     st.markdown(f"### 🔄 Upload v{ver.upper()}")
     uploaded = st.file_uploader(f"Upload CSV for {ver.upper()}", type=["csv"], key=ver)
@@ -166,7 +176,17 @@ if st.button("📈 View Metrics + Drift"):
 # 🔁 Retrain Both Models
 # -------------------------------
 if st.button("🔁 Retrain Models"):
+    
+if mode == "📘 Example Dataset":
+    # Copy examples to upload folder to simulate flow
     for ver in ["v1", "v2"]:
+        import shutil
+        shutil.copyfile(f"{EXAMPLE_DIR}/housing_{ver}.csv", DATA_PATHS[ver])
+        with open(TARGET_META[ver], "w") as f:
+            f.write("target")
+        train_model(pd.read_csv(DATA_PATHS[ver]), ver, "target")
+
+for ver in ["v1", "v2"]:
         df = get_data(ver)
         target = get_target_col(ver, df)
         train_model(df, ver, target)
